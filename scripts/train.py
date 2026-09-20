@@ -5,6 +5,7 @@ from config import DataConfig, ModelConfig, TrainConfig
 from nika.dataset import TokenDataset
 from nika.model import Nika
 from nika.report import TrainReport
+from nika.schedule import get_lr
 
 torch.backends.cuda.matmul.allow_tf32 = True
 torch.backends.cudnn.allow_tf32 = True
@@ -58,6 +59,10 @@ if __name__ == "__main__":
             _, loss = model(x, y)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
+        
+        lr = get_lr(step, cfg.max_iters, cfg.learning_rate, cfg.warmup_iters, cfg.min_lr_frac)
+        for group in optimizer.param_groups:
+            group["lr"] = lr
         optimizer.step()
 
     tr = estimate_loss(model, train_ds, cfg.eval_iters)

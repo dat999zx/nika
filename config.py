@@ -28,6 +28,8 @@ class TrainConfig:
     learning_rate: float = 1e-3
     eval_interval: int = 250 # measure train/val loss every this many steps
     eval_iters: int = 20 # batches averaged per measurement from train.bin and val.bin (to check bias-variance)
+    warmup_iters: int = 200 # steps to ramp the LR up from 0 to max
+    min_lr_frac: float = 0.1 # at the end of training, lr is 10% of max not 0
     checkpoint_path: str = "checkpoint/nika.pt"
 
 @dataclass
