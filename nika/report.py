@@ -1,9 +1,14 @@
 import time
 from dataclasses import asdict
 
+import matplotlib
+matplotlib.use("Agg") # no GUI window, just write the png
+import matplotlib.pyplot as plt
+
 class TrainReport:
     def __init__(self, path, model, cfg, mcfg, dcfg):
         self.path = path
+        self.plot_path = path.replace("_report.md", "_loss.png")
         self.model = model
         self.cfg, self.mcfg, self.dcfg = cfg, mcfg, dcfg
         self.rows = [] # (step, train, val, seconds)
@@ -17,11 +22,24 @@ class TrainReport:
         self.rows.append((step, train_loss, val_loss, time.time() - self.start))
         if val_loss < self.best_val:
             self.best_val, self.best_step = val_loss, step
+        self.plot()
         self.write()
 
     def finish(self):
         self.done = True
+        self.plot()
         self.write()
+
+    # redrawn on every update, so the report preview stays current
+    def plot(self):
+        steps = [r[0] for r in self.rows]
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(steps, [r[1] for r in self.rows], label="train")
+        ax.plot(steps, [r[2] for r in self.rows], label="val")
+        ax.set_xlabel("step"); ax.set_ylabel("loss"); ax.legend()
+        fig.tight_layout()
+        fig.savefig(self.plot_path)
+        plt.close(fig) # close it or the figures pile up in memory
 
     # everything below just formats the file
     def write(self):

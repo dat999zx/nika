@@ -3,7 +3,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 # 1 attention head
-class Head(nn.Module):
+class AttentionHead(nn.Module):
     def __init__(self, n_embed, head_size, block_size):
         super().__init__()
         self.head_size = head_size
@@ -26,7 +26,7 @@ class Head(nn.Module):
 if __name__ == "__main__":
     torch.manual_seed(0)
     B, T, C, hs = 2, 8, 16, 4
-    head = Head(C, hs, block_size=T)
+    head = AttentionHead(C, hs, block_size=T)
     x = torch.randn(B, T, C)
     out = head(x)
     print(out.shape)                                   # (2, 8, 4)

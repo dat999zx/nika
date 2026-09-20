@@ -5,7 +5,6 @@ from config import DataConfig, ModelConfig, TrainConfig
 from nika.dataset import TokenDataset
 from nika.model import Nika
 from nika.report import TrainReport
-import matplotlib.pyplot as plt
 
 @torch.no_grad() # ignore gradient since we are only measuring
 def estimate_loss(model: Nika, ds: TokenDataset, eval_iters):
@@ -34,14 +33,6 @@ if __name__ == "__main__":
     best_val = float("inf") # best val loss
     history = [] # losses history
     report = TrainReport(cfg.checkpoint_path.replace(".pt", "_report.md"), model, cfg, mcfg, dcfg)
-    
-    plt.ion() # interactive: dont block on draw
-    fig, (ax_tr, ax_va) = plt.subplots(1, 2, figsize=(10, 4), sharey=True)
-    train_line, = ax_tr.plot([], [], color="tab:blue")
-    val_line, = ax_va.plot([], [], color="tab:orange")
-    ax_tr.set_title("train loss"); ax_tr.set_xlabel("step"); ax_tr.set_ylabel("loss")
-    ax_va.set_title("val loss"); ax_va.set_xlabel("step")
-    fig.tight_layout()
 
     for step in range(cfg.max_iters):
         if step % cfg.eval_interval == 0: # validate
@@ -57,13 +48,6 @@ if __name__ == "__main__":
                 print(f"\nnew best saved\n")
             
             print(f"\nstep {step}: train {tr:.3f} | val {va:.3f}\n")
-            
-            steps = [h[0] for h in history]
-            train_line.set_data(steps, [h[1] for h in history])
-            val_line.set_data(steps, [h[2] for h in history])
-            for ax in (ax_tr, ax_va):
-                ax.relim(); ax.autoscale_view()
-            plt.pause(0.001)
 
         x, y = train_ds.get_batch()
         _, loss = model(x, y)
@@ -80,17 +64,8 @@ if __name__ == "__main__":
         torch.save({"model": model.state_dict(), "cfg": mcfg, "history": history}, cfg.checkpoint_path)
     print(f"\nfinal: train {tr:.3f} | val {va:.3f} | best val {best_val:.3f}\n")
 
-    steps = [h[0] for h in history]
-    train_line.set_data(steps, [h[1] for h in history])
-    val_line.set_data(steps, [h[2] for h in history])
-    for ax in (ax_tr, ax_va):
-        ax.relim(); ax.autoscale_view()
-
     last_path = cfg.checkpoint_path.replace(".pt", "_last.pt")
     torch.save({"model": model.state_dict(), "cfg": mcfg, "history": history}, last_path)
     print("saved", cfg.checkpoint_path, "and", last_path)
 
-    fig.savefig(cfg.checkpoint_path.replace(".pt", "_loss.png"))
     report.finish()
-    plt.ioff()
-    plt.show()
