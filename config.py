@@ -14,3 +14,9 @@ class DataConfig:
     train_bin_path: str = "data/train.bin"
     val_bin_path: str = "data/val.bin"
     val_fraction: float = 0.1
+
+@dataclass
+class TrainConfig:
+    block_size: int = 128 # context size
+    batch_size: int = 32 # nums of docs feed into each training step
+    device: str = "cuda"
