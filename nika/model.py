@@ -8,10 +8,13 @@ class Nika(nn.Module):
         super().__init__()
         self.cfg = cfg
         self.token_embed = nn.Embedding(cfg.vocab_size, cfg.n_embed)
+        self.pos_embed = nn.Embedding(cfg.block_size, cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
     
     def forward(self, idx, targets=None):
-        x = self.token_embed(idx) # (B, T, C) get embedding vector
+        B, T = idx.shape
+        pos = torch.arange(T, device=idx.device)
+        x = self.token_embed(idx) + self.pos_embed(pos) # general context + position
         logits = self.lm_head(x) # (B, T, vocab_size) calculate score for each token in vocab, best is predicted as next token
         
         loss = None
