@@ -6,6 +6,7 @@ from config import ModelConfig
 class Nika(nn.Module):
     def __init__(self, cfg: ModelConfig):
         super().__init__()
+        self.cfg = cfg
         self.token_embed = nn.Embedding(cfg.vocab_size, cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
     
@@ -20,3 +21,21 @@ class Nika(nn.Module):
             loss = F.cross_entropy(logits.view(B * T, V), targets.view(B * T))
         
         return logits, loss
+
+    @torch.no_grad()
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -self.cfg.block_size:] # take only last context_size chunk
+            
+            logits, _ = self(idx_cond) # forward
+            logits = logits[:, -1, :] # take last token prediction for next one
+            logits /= temperature
+
+            if top_k is not None:
+                v, _ = torch.topk(logits, top_k)
+                logits[logits < v[:, [-1]]] = -float("inf") # only top k remain
+            
+            probs = F.softmax(logits, dim=-1)
+            idx_next = torch.multinomial(probs, num_samples=1) # weighted random
+            idx = torch.cat((idx, idx_next), dim=1) # add predicted token to the end
+        return idx
