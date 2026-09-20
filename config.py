@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
 DATA_PATH = "data/tiny.txt"
-VOCAB_SIZE = 4096
+VOCAB_SIZE = 4096 # how many type of token it can learn
+BLOCK_SIZE = 128 # context size (tokens)
 
 @dataclass
 class TokenizerConfig:
@@ -20,12 +21,17 @@ class DataConfig:
 
 @dataclass
 class TrainConfig:
-    block_size: int = 128 # context size
-    batch_size: int = 32 # nums of docs feed into each training step
+    block_size: int = BLOCK_SIZE # T
+    batch_size: int = 32 # B: windows per training step
     device: str = "cuda"
+    max_iters: int = 3000 # training steps, run train.bin
+    learning_rate: float = 1e-3
+    eval_interval: int = 250 # measure train/val loss every this many steps
+    eval_iters: int = 20 # batches averaged per measurement from train.bin and val.bin (to check bias-variance)
+    checkpoint_path: str = "checkpoint/nika.pt"
 
 @dataclass
 class ModelConfig:
     vocab_size: int = VOCAB_SIZE
     n_embed: int = 64 # embedding vector size
-    block_size: int = 128 # context size
+    block_size: int = BLOCK_SIZE
