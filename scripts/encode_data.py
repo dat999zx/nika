@@ -12,7 +12,8 @@ from config import DataConfig
 from nika.tokenizer import BPETokenizer, EOT
 
 BATCH = 500 # documents per task
-WINDOW = 64 # tasks held in memory at once (bounds RAM: ~WINDOW * BATCH docs)
+WINDOW = 8 # tasks held in memory at once (bounds RAM: ~WINDOW * BATCH docs)
+           # also how often progress is printed and bytes hit the disk
 
 # one tokenizer per worker process, loaded once instead of pickled per task
 _tok = None
