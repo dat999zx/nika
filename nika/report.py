@@ -6,14 +6,16 @@ matplotlib.use("Agg") # no GUI window, just write the png
 import matplotlib.pyplot as plt
 
 class TrainReport:
-    def __init__(self, path, model, cfg, mcfg, dcfg):
+    def __init__(self, path, model, cfg, mcfg, dcfg, rows=None):
         self.path = path
         self.plot_path = path.replace("_report.md", "_loss.png")
         self.model = model
         self.cfg, self.mcfg, self.dcfg = cfg, mcfg, dcfg
-        self.rows = [] # (step, train, val, seconds)
+        # (step, train, val, seconds). rows carried over from a resumed run have no
+        # timing of their own, so they get 0 minutes.
+        self.rows = [(s, tr, va, 0.0) for s, tr, va in (rows or [])]
         self.start = time.time()
-        self.best_val = float("inf")
+        self.best_val = min((r[2] for r in self.rows), default=float("inf"))
         self.best_step = None
         self.done = False
         self.write()
