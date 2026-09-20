@@ -1,0 +1,10 @@
+.knowl/
+.codex/
+.claude/
+.mcp.json
+AGENTS.md
+CLAUDE.md
+KNOWL.md
+.venv/
+data/
+__pycache__/
