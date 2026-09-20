@@ -36,6 +36,37 @@ class MultiHeadAttention(nn.Module):
         out = torch.cat([h(x) for h in self.heads], dim=-1) # (B, T, n_head * head_size) = (B, T, C)
         return self.proj(out)
 
+# multihead attention but instead of loop, use matrices
+class FastMultiHeadAttention(nn.Module):
+    def __init__(self, n_embed, n_head, block_size):
+        super().__init__()
+        self.n_head = n_head
+        self.head_size = n_embed // n_head
+        self.query = nn.Linear(n_embed, n_embed, bias=False) # all heads at once
+        self.key = nn.Linear(n_embed, n_embed, bias=False)
+        self.value = nn.Linear(n_embed, n_embed, bias=False)
+        self.proj = nn.Linear(n_embed, n_embed)
+        self.register_buffer("tril", torch.tril(torch.ones(block_size, block_size)))
+    
+    def forward(self, x):
+        B, T, C = x.shape
+        # one matmul each, then read the C numbers as n_head groups of head_size,
+        # and move the head axis in front of T so every head is its own batch
+        q = self.query(x).view(B, T, self.n_head, self.head_size).transpose(1, 2) # (B, n_head, T, head_size)
+        k = self.key(x).view(B, T, self.n_head, self.head_size).transpose(1, 2)
+        v = self.value(x).view(B, T, self.n_head, self.head_size).transpose(1, 2)
+
+        # identical to AttentionHead, but every head at once
+        scores = q @ k.transpose(-2, -1) / (self.head_size ** 0.5) # (B, n_head, T, T)
+        scores = scores.masked_fill(self.tril[:T, :T] == 0, float("-inf"))
+        weights = F.softmax(scores, dim=-1)
+        out = weights @ v # (B, n_head, T, head_size)
+
+        # heads back side by side: (B, n_head, T, hs) -> (B, T, n_head, hs) -> (B, T, C)
+        # contiguous(): transpose only changes how memory is read, view needs the real order
+        out = out.transpose(1, 2).contiguous().view(B, T, C)
+        return self.proj(out)
+
 if __name__ == "__main__":
     torch.manual_seed(0)
     B, T, C, hs = 2, 8, 16, 4
@@ -54,3 +85,16 @@ if __name__ == "__main__":
     
     mha = MultiHeadAttention(C, 4, block_size=T)   # C=16, 4 heads of size 4
     print(mha(x).shape)                            # (2, 8, 16)
+
+    # the fast version must compute exactly what the slow one does
+    # each head's query weight is (head_size, C); stacking the 4 of them
+    # vertically gives the (C, C) matrix the fast version uses
+    fast = FastMultiHeadAttention(C, 4, block_size=T)
+    with torch.no_grad():
+        fast.query.weight.copy_(torch.cat([h.query.weight for h in mha.heads], dim=0))
+        fast.key.weight.copy_(torch.cat([h.key.weight for h in mha.heads], dim=0))
+        fast.value.weight.copy_(torch.cat([h.value.weight for h in mha.heads], dim=0))
+        fast.proj.weight.copy_(mha.proj.weight)
+        fast.proj.bias.copy_(mha.proj.bias)
+    assert torch.allclose(mha(x), fast(x), atol=1e-6)
+    print("fast matches slow")

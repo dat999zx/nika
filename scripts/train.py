@@ -6,6 +6,9 @@ from nika.dataset import TokenDataset
 from nika.model import Nika
 from nika.report import TrainReport
 
+torch.backends.cuda.matmul.allow_tf32 = True
+torch.backends.cudnn.allow_tf32 = True
+
 @torch.no_grad() # ignore gradient since we are only measuring
 def estimate_loss(model: Nika, ds: TokenDataset, eval_iters):
     model.eval() # switch to "measuring" mode
@@ -13,7 +16,8 @@ def estimate_loss(model: Nika, ds: TokenDataset, eval_iters):
     losses = torch.zeros(eval_iters)
     for k in range(eval_iters):
         x, y = ds.get_batch()
-        _, loss = model(x, y)
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            _, loss = model(x, y)
         losses[k] = loss.item()
     
     model.train() # back to "learning" mode
@@ -50,7 +54,8 @@ if __name__ == "__main__":
             print(f"\nstep {step}: train {tr:.3f} | val {va:.3f}\n")
 
         x, y = train_ds.get_batch()
-        _, loss = model(x, y)
+        with torch.autocast("cuda", dtype=torch.bfloat16):
+            _, loss = model(x, y)
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()

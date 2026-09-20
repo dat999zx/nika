@@ -1,12 +1,12 @@
 import torch.nn as nn
-from nika.attention import MultiHeadAttention
+from nika.attention import FastMultiHeadAttention
 from nika.mlp import MLP
 
 class Block(nn.Module):
     def __init__(self, n_embed, n_head, block_size):
         super().__init__()
         self.ln1 = nn.LayerNorm(n_embed)
-        self.attention = MultiHeadAttention(n_embed, n_head, block_size)
+        self.attention = FastMultiHeadAttention(n_embed, n_head, block_size)
         self.ln2 = nn.LayerNorm(n_embed)
         self.mlp = MLP(n_embed)
 
