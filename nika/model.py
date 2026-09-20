@@ -3,6 +3,7 @@ import torch.nn as nn
 from torch.nn import functional as F
 from config import ModelConfig
 from nika.attention import AttentionHead
+from nika.mlp import MLP
 
 class Nika(nn.Module):
     def __init__(self, cfg: ModelConfig):
@@ -11,13 +12,15 @@ class Nika(nn.Module):
         self.token_embed = nn.Embedding(cfg.vocab_size, cfg.n_embed)
         self.pos_embed = nn.Embedding(cfg.block_size, cfg.n_embed)
         self.attention_head = AttentionHead(cfg.n_embed, cfg.n_embed, cfg.block_size)
+        self.mlp = MLP(cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
     
     def forward(self, idx, targets=None):
         B, T = idx.shape
         pos = torch.arange(T, device=idx.device)
         x = self.token_embed(idx) + self.pos_embed(pos) # general context + position
-        x = x + self.attention_head(x) # attention
+        x = x + self.attention_head(x) # gather from other tokens
+        x = x + self.mlp(x) # think about what was gathered
         logits = self.lm_head(x) # (B, T, vocab_size) calculate score for each token in vocab, best is predicted as next token
         
         loss = None
