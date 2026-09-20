@@ -41,6 +41,7 @@ class BPETokenizer:
     def __init__(self):
         self.merges = {} # (a, b) -> new_id
         self.vocab = [bytes([i]) for i in range(256)]
+        self._cache = {} # word -> ids, filled by encode
     
     # verbose: print progress every 100 glues (useful for long runs)
     def train(self, text, vocab_size, verbose=False):
@@ -109,7 +110,13 @@ class BPETokenizer:
             if i > 0:
                 ids.append(self.eot_id)
             for word in split_words(doc):
-                ids.extend(self._encode_word(word))
+                # the same few thousand words repeat endlessly, so replaying the
+                # glues once per unique word instead of once per occurrence is
+                # the difference between hours and minutes on a big corpus
+                cached = self._cache.get(word)
+                if cached is None:
+                    cached = self._cache[word] = self._encode_word(word)
+                ids.extend(cached)
         return ids
 
     # replay the learnt glues on one word, earliest glue first
