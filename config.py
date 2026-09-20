@@ -35,3 +35,4 @@ class ModelConfig:
     vocab_size: int = VOCAB_SIZE
     n_embed: int = 64 # embedding vector size
     block_size: int = BLOCK_SIZE
+    n_head: int = 4 # attention heads, n_embed must divide evenly by this
