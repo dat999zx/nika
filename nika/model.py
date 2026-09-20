@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from config import ModelConfig
-from nika.attention import MultiHeadAttention
-from nika.mlp import MLP
+from nika.block import Block
 
 class Nika(nn.Module):
     def __init__(self, cfg: ModelConfig):
@@ -11,19 +10,17 @@ class Nika(nn.Module):
         self.cfg = cfg
         self.token_embed = nn.Embedding(cfg.vocab_size, cfg.n_embed)
         self.pos_embed = nn.Embedding(cfg.block_size, cfg.n_embed)
-        self.ln1 = nn.LayerNorm(cfg.n_embed) # before attention
-        self.ln2 = nn.LayerNorm(cfg.n_embed) # before mlp
+        self.blocks = nn.Sequential(*[ # * in python unpack the list
+            Block(cfg.n_embed, cfg.n_head, cfg.block_size) for _ in range(cfg.n_layer)
+        ])
         self.ln_final = nn.LayerNorm(cfg.n_embed) # before lm_head
-        self.attention = MultiHeadAttention(cfg.n_embed, cfg.n_head, cfg.block_size)
-        self.mlp = MLP(cfg.n_embed)
         self.lm_head = nn.Linear(cfg.n_embed, cfg.vocab_size)
     
     def forward(self, idx, targets=None):
         B, T = idx.shape
         pos = torch.arange(T, device=idx.device)
         x = self.token_embed(idx) + self.pos_embed(pos) # general context + position
-        x = x + self.attention(self.ln1(x)) # gather from other tokens
-        x = x + self.mlp(self.ln2(x)) # think about what was gathered
+        x = self.blocks(x)
         logits = self.lm_head(self.ln_final(x)) # (B, T, vocab_size) calculate score for each token in vocab, best is predicted as next token
         
         loss = None
