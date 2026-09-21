@@ -15,6 +15,7 @@ if __name__ == "__main__":
     p.add_argument("--temperature", type=float, default=0.8)
     p.add_argument("--top-k", type=int, default=50)
     p.add_argument("--samples", type=int, default=1)
+    p.add_argument("--stop", action="store_true", help="stop at <|EOT|> instead of filling --tokens")
     p.add_argument("--checkpoint", default=cfg.checkpoint_path)
     args = p.parse_args()
 
@@ -28,6 +29,7 @@ if __name__ == "__main__":
     idx = torch.tensor([ids], dtype=torch.long, device=cfg.device)
 
     for i in range(args.samples):
-        out = model.generate(idx, args.tokens, temperature=args.temperature, top_k=args.top_k)
+        out = model.generate(idx, args.tokens, temperature=args.temperature, top_k=args.top_k,
+                             stop_token=tok.eot_id if args.stop else None)
         print(f"\n--- sample {i + 1} (temp {args.temperature}, top_k {args.top_k}) ---")
         print(tok.decode(out[0].tolist()))

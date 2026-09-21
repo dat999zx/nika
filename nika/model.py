@@ -32,7 +32,7 @@ class Nika(nn.Module):
         return logits, loss
 
     @torch.no_grad()
-    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None):
+    def generate(self, idx, max_new_tokens, temperature=1.0, top_k=None, stop_token=None):
         for _ in range(max_new_tokens):
             idx_cond = idx[:, -self.cfg.block_size:] # take only last context_size chunk
             
@@ -47,4 +47,8 @@ class Nika(nn.Module):
             probs = F.softmax(logits, dim=-1)
             idx_next = torch.multinomial(probs, num_samples=1) # weighted random
             idx = torch.cat((idx, idx_next), dim=1) # add predicted token to the end
+
+            # stop early when every row has ended its text
+            if stop_token is not None and (idx_next == stop_token).all():
+                break
         return idx
