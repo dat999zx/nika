@@ -33,6 +33,7 @@ def parse_args(cfg, mcfg, dcfg):
     p.add_argument("--train-bin", default=dcfg.train_bin_path)
     p.add_argument("--val-bin", default=dcfg.val_bin_path)
     p.add_argument("--resume", action="store_true", help="continue from the _last.pt checkpoint")
+    p.add_argument("--amp-dtype", default="auto", choices=["auto", "bf16", "fp16", "fp32"])
     # checkpoints are written locally every eval (fast) and copied to a slow, permanent
     # place (Google Drive) every --backup-every evals
     p.add_argument("--backup-dir", default="", help="copy checkpoints here, e.g. a Drive folder")
@@ -47,13 +48,20 @@ def parse_args(cfg, mcfg, dcfg):
     return cfg, mcfg, dcfg, a
 
 
-def pick_amp(device):
-    """bf16 where supported (Ampere+), else fp16 + a gradient scaler (Colab's T4)"""
-    if device != "cuda":
+def pick_amp(device, choice="auto"):
+    """bf16 where the hardware does it natively (Ampere+), else fp16 + a gradient scaler.
+
+    is_bf16_supported() says True on a T4 because bf16 can be EMULATED there, which is
+    slower than fp16, so ask for native support only.
+    """
+    if device != "cuda" or choice == "fp32":
         return torch.float32, False
-    if torch.cuda.is_bf16_supported():
+    if choice == "bf16":
         return torch.bfloat16, False
-    return torch.float16, True
+    if choice == "fp16":
+        return torch.float16, True
+    native_bf16 = torch.cuda.is_bf16_supported(including_emulation=False)
+    return (torch.bfloat16, False) if native_bf16 else (torch.float16, True)
 
 
 def save(path, **payload):
@@ -105,7 +113,7 @@ if __name__ == "__main__":
     plot_path = cfg.checkpoint_path.replace(".pt", "_loss.png")
     backup_paths = [cfg.checkpoint_path, last_path, report_path, plot_path]
 
-    amp_dtype, need_scaler = pick_amp(cfg.device)
+    amp_dtype, need_scaler = pick_amp(cfg.device, args.amp_dtype)
     scaler = torch.amp.GradScaler(cfg.device, enabled=need_scaler)
     print(f"device {cfg.device} | autocast {amp_dtype} | grad scaler {need_scaler}")
 
