@@ -1,10 +1,23 @@
 import argparse
+import re
 
 import torch
 
 from config import DataConfig, TrainConfig
 from nika.model import Nika
 from nika.tokenizer import BPETokenizer
+
+
+def space_digits(text):
+    """'what is 23 + 45?' -> 'what is 2 3 + 4 5?', the format the model was trained on"""
+    return re.sub(r"\d+", lambda m: " ".join(m.group()), text)
+
+
+def unspace_digits(text):
+    """'8 6' -> '68': answers are generated least significant digit first"""
+    stripped = text.replace(" ", "")
+    return stripped[::-1] if stripped.isdigit() else text
+
 
 if __name__ == "__main__":
     cfg, dcfg = TrainConfig(), DataConfig()
@@ -31,7 +44,7 @@ if __name__ == "__main__":
         if msg in ("quit", "exit"):
             break
 
-        history += f"A: {msg}\nB:"
+        history += f"A: {space_digits(msg)}\nB:"
         ids = tok.encode(history)[-block_size:] # oldest turns drop out of the window
         idx = torch.tensor([ids], dtype=torch.long, device=cfg.device)
 
@@ -41,5 +54,5 @@ if __name__ == "__main__":
         reply = tok.decode(out[0, len(ids):].tolist()) # only the new tokens
         reply = reply.split("\n")[0].replace(tok.decode([tok.eot_id]), "").strip()
 
-        print(f"B: {reply}    [{len(ids)}/{block_size} tokens of context]")
-        history += f" {reply}\n"
+        history += f" {reply}\n" # the history keeps the model's own format
+        print(f"B: {unspace_digits(reply)}    [{len(ids)}/{block_size} tokens of context]")
