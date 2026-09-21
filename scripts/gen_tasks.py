@@ -62,8 +62,10 @@ def sample_pair():
 
 
 def is_heldout(a, b):
-    # deterministic, unlike hash(), which is salted per process
-    return a + b == HELDOUT_SUM or (a * MAX + b) % 20 == 0
+    # deterministic, unlike hash(), which is salted per process.
+    # 101 rather than MAX: with MAX=100, a*100 % 20 is always 0, so EVERY pair
+    # with b=0 was held out and the model never saw "x + 0" in training at all.
+    return a + b == HELDOUT_SUM or (a * 101 + b) % 20 == 0
 
 
 if __name__ == "__main__":
