@@ -1,3 +1,4 @@
+import os
 import time
 from dataclasses import asdict
 
@@ -84,6 +85,8 @@ class TrainReport:
             ]
             for step, tr, va, secs in self.rows:
                 lines.append(f"| {step} | {tr:.3f} | {va:.3f} | {va - tr:+.3f} | {secs / 60:.1f} |")
-            lines += ["", "## Loss curve", "", "![loss](nika_loss.png)", ""]
+            # the plot sits next to the report, so link it by its own name:
+            # hardcoding one name made every report point at the same picture
+            lines += ["", "## Loss curve", "", f"![loss]({os.path.basename(self.plot_path)})", ""]
 
         return lines

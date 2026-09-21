@@ -34,6 +34,9 @@ def parse_args(cfg, mcfg, dcfg):
     p.add_argument("--val-bin", default=dcfg.val_bin_path)
     p.add_argument("--resume", action="store_true", help="continue from the _last.pt checkpoint")
     p.add_argument("--amp-dtype", default="auto", choices=["auto", "bf16", "fp16", "fp32"])
+    # fine-tuning: take a trained model's weights but start a new run around them
+    # (fresh optimizer, fresh schedule, step back to 0, its own checkpoint path)
+    p.add_argument("--init-from", default="", help="checkpoint to copy weights from")
     # checkpoints are written locally every eval (fast) and copied to a slow, permanent
     # place (Google Drive) every --backup-every evals
     p.add_argument("--backup-dir", default="", help="copy checkpoints here, e.g. a Drive folder")
@@ -140,6 +143,15 @@ if __name__ == "__main__":
                 print("scaler state not loaded, starting it fresh:", e)
         start_step, best_val, history = ckpt["step"], ckpt["best_val"], ckpt["history"]
         print(f"resumed from {last_path} at step {start_step}, best val {best_val:.3f}")
+    elif args.init_from:
+        ckpt = torch.load(args.init_from, map_location=cfg.device, weights_only=False)
+        mcfg = ckpt["cfg"] # the architecture has to match the weights being loaded
+        model = Nika(mcfg).to(cfg.device)
+        model.load_state_dict(ckpt["model"])
+        # NO optimizer.load_state_dict: adam's momentum from pretraining points at the
+        # old data, and the whole point of fine-tuning is a gentle fresh start
+        optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate)
+        print(f"initialised from {args.init_from} (weights only, fresh optimizer)")
     else:
         model = Nika(mcfg).to(cfg.device)
         optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate)

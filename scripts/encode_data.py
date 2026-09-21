@@ -3,7 +3,9 @@
 Streams: documents are read, encoded and written a window at a time, so peak memory
 stays flat whether the input is 100 MB or 20 GB.
 """
+import argparse
 import os
+from dataclasses import replace
 from multiprocessing import Pool
 
 import numpy as np
@@ -18,11 +20,9 @@ WINDOW = 8 # tasks held in memory at once (bounds RAM: ~WINDOW * BATCH docs)
 # one tokenizer per worker process, loaded once instead of pickled per task
 _tok = None
 
-
 def _init(tokenizer_path):
     global _tok
     _tok = BPETokenizer.load(tokenizer_path)
-
 
 # must be module level: workers re-import this file and look the function up by name
 def _encode_batch(batch_text):
@@ -64,11 +64,18 @@ def windows(iterable, size):
 
 
 if __name__ == "__main__":
-    cfg = DataConfig()
+    # paths on the command line, so the same script encodes the web text and the dialogue
+    defaults = DataConfig()
+    p = argparse.ArgumentParser()
+    p.add_argument("--data", default=defaults.data_path)
+    p.add_argument("--train-bin", default=defaults.train_bin_path)
+    p.add_argument("--val-bin", default=defaults.val_bin_path)
+    a = p.parse_args()
+    cfg = replace(defaults, data_path=a.data, train_bin_path=a.train_bin, val_bin_path=a.val_bin)
     tok = BPETokenizer.load(cfg.tokenizer_path)
     os.makedirs(os.path.dirname(cfg.train_bin_path), exist_ok=True)
 
-    all_path = cfg.train_bin_path.replace("train.bin", "all.bin")
+    all_path = cfg.train_bin_path + ".all" # temp file, deleted after the split
     n_tokens = n_eot = n_batches = 0
 
     # pass 1: encode and append straight to disk, a window of tasks at a time
