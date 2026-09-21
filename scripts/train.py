@@ -130,7 +130,14 @@ if __name__ == "__main__":
         model.load_state_dict(ckpt["model"])
         optimizer = torch.optim.AdamW(model.parameters(), lr=cfg.learning_rate)
         optimizer.load_state_dict(ckpt["optimizer"]) # adam's momentum, or the loss jumps on resume
-        scaler.load_state_dict(ckpt["scaler"])
+        # a checkpoint written under bf16 has an empty scaler state, and loading that
+        # into an enabled scaler raises. Switching precision mid-run is fine: the
+        # scaler just recalibrates over the next few steps.
+        if ckpt.get("scaler"):
+            try:
+                scaler.load_state_dict(ckpt["scaler"])
+            except RuntimeError as e:
+                print("scaler state not loaded, starting it fresh:", e)
         start_step, best_val, history = ckpt["step"], ckpt["best_val"], ckpt["history"]
         print(f"resumed from {last_path} at step {start_step}, best val {best_val:.3f}")
     else:
